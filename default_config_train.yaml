@@ -1,0 +1,37 @@
+model_opts:
+  name: vgg16
+  args:
+    inchannels: 1
+    outchannels: 2
+
+train_par:
+  gpu_to_use: "cuda:0"
+  random_seed: "default"
+  epochs: 50
+  batch_size: 32
+  workers: 5
+  lr: 0.001
+  momentum: 0.9
+  weight_decay: 0.0001
+  eval_threshold: 0.75
+  patience: 10
+  early_stopping_flag: True
+  results_path: "./results"
+  optimizer:
+    name: "Adam"
+  loss_opts:
+    name: "CrossEntropyLoss"
+    args:
+      alpha: 1
+      gamma: 2
+
+dataset:
+  experiment: "breast_cancer_classification"
+  data_dir: "./Breast AI study data"  # Directorio raíz con las carpetas benign y malign
+  train_dir: "./Breast AI study data/train.csv"
+  test_dir: "./Breast AI study data/test.csv"
+  rescale_factor: 224                # Tamaño de las imágenes
+  cache_data: False
+
+wandb:
+  prefix_name: "binary_classification"
