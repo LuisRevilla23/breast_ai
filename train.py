@@ -7,8 +7,8 @@ import numpy as np
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
 import wandb  # Import wandb
-from model.model_lightning import MyModel  # Update import with folder name
-from utils.data_datamodule import BreastDataModule  # Updated import
+from model.model_lightning import MyModel, MyModelMulticlass  # Update import with folder name
+from utils.data_datamodule import BreastDataModule, BreastDataModuleMulticlass  # Updated import
 import os
 import lightning as L
 
@@ -29,7 +29,7 @@ def main(config_file):
     conf.train_par.results_model_filename = os.path.join(results_path, 'best_model.pt')
 
     # Inicializar DataModule
-    data_module = BreastDataModule(
+    data_module = BreastDataModuleMulticlass(
         batch_size=conf.train_par.batch_size,
         workers=conf.train_par.workers,
         train_file=conf.dataset.train_dir,
@@ -39,11 +39,11 @@ def main(config_file):
     )
 
     # Inicializar modelo Lightning
-    model = MyModel(model_opts=conf.model_opts, train_par=conf.train_par)
+    model = MyModelMulticlass(model_opts=conf.model_opts, train_par=conf.train_par)
 
     # Configurar Wandb Logger
     wandb_logger = WandbLogger(
-        project="Breast",
+        project="Breast_Multiclass",
         config=conf,
         name=f"{conf.wandb.prefix_name}_{conf.dataset.experiment}"
     )
@@ -81,7 +81,7 @@ def main(config_file):
     trainer.test(model=model, datamodule=data_module)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Script de entrenamiento para clasificación binaria')
+    parser = argparse.ArgumentParser(description='Script de entrenamiento para clasificación multicategoria')
     parser.add_argument('--config-file', type=str, default='./default_config_train.yaml', help='Ruta al archivo de configuración YAML')
     args = parser.parse_args()
 
