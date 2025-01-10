@@ -200,3 +200,94 @@ class BreastDataset2D(Dataset):
             image_tensor = self.transform(image_tensor)
 
         return image_tensor, torch.tensor(label).long(), patient_id
+    
+
+class BreastDataset2DMulticlass(Dataset):
+    """
+    Dataset that loads ALL .png images from each patient's folder
+    as separate samples for multiclass classification.
+    """
+
+    def __init__(self, csv_file, data_dir, transform=None, resize_to=(224, 224)):
+        """
+        Args:
+            csv_file (str): Path to a CSV containing at least:
+                            - "Patient_ID"
+                            - "SOC_binario" (with values "maligno" or "benigno")
+                            - "Diagnosis" (with values 'No follow up', 'Follow up', 'Biopsy')
+            data_dir (str): Base directory where 'benign'/'malign' folders exist,
+                            each containing patient subfolders with images.
+            transform (callable, optional): Optional PyTorch-style transform
+                                            to apply to each image tensor.
+            resize_to (tuple): (width, height) size to resize images, e.g. (224, 224).
+        """
+        self.transform = transform
+        self.resize_to = resize_to
+
+        # Mapping for multiclass labels
+        self.diagnosis_mapping = {
+            'No follow up': 0,
+            'Follow up': 1,
+            'Biopsy': 2
+        }
+
+        # Read the CSV with patient & label info
+        df = pd.read_csv(csv_file)
+
+        # We'll collect (image_path, label, patient_id) tuples here
+        self.samples = []
+
+        # Go through each patient row in the CSV
+        for i in range(len(df)):
+            row = df.iloc[i]
+            patient_id = row["Patient_ID"]
+            soc_binario = row["SOC_binario"]  # "maligno" or "benigno"
+            diagnosis = row["BIRADS_CAT"]
+
+            if diagnosis not in self.diagnosis_mapping:
+                raise ValueError(f"Unexpected diagnosis: {diagnosis}")
+
+            label = self.diagnosis_mapping[diagnosis]
+
+            # Build the path to the patient's folder
+            if soc_binario == "benigno":
+                folder_path = os.path.join(data_dir, "benign", str(patient_id), "cropped_p2")
+            elif soc_binario == "maligno":
+                folder_path = os.path.join(data_dir, "malign", str(patient_id), "cropped_p2")
+            else:
+                raise ValueError(f"Unexpected SOC_binario value: {soc_binario}")
+
+            # Collect ALL .png/.jpg files in that folder
+            image_files = glob.glob(os.path.join(folder_path, "*.png")) + glob.glob(os.path.join(folder_path, "*.jpg"))
+            if not image_files:
+                print(f"Warning: no .png or .jpg files found for patient {patient_id} at {folder_path}")
+                continue
+
+            # Each .png is a separate training sample
+            for image_path in image_files:
+                self.samples.append((image_path, label, patient_id))  # Include patient_id
+
+        print(f"[BreastDatasetMulticlass] Found {len(self.samples)} total images across all patients.")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        img_path, label, patient_id = self.samples[idx]
+
+        # Read the image in grayscale
+        image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+        if image is None:
+            raise FileNotFoundError(f"Could not load image: {img_path}")
+
+        image = cv2.resize(image, self.resize_to)  # [H, W]
+        image_tensor = torch.tensor(image).unsqueeze(0).float() / 255.0  # shape [1, H, W]
+
+        # Repeat along channel dimension => shape [3, H, W]
+        image_tensor = image_tensor.repeat(3, 1, 1)
+
+        # Apply any additional transforms
+        if self.transform:
+            image_tensor = self.transform(image_tensor)
+
+        return image_tensor, torch.tensor(label).long(), patient_id
